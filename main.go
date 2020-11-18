@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/incognitochain/incognito-chain/incognitokey"
 )
 
 func main() {
@@ -20,22 +18,32 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				var keySet incognitokey.KeySet
-				txList[0].Proof.GetInputCoins()[0].CoinDetails.GetSerialNumber()
-				coin := txList[0].Proof.GetOutputCoins()[0]
-				if coin.CoinDetailsEncrypted != nil && !coin.CoinDetailsEncrypted.IsNil() {
-					if len(keySet.ReadonlyKey.Rk) > 0 {
-						// try to decrypt to get more data
-						err := coin.Decrypt(keySet.ReadonlyKey)
-						if err != nil {
-							panic(err)
-						}
+				for _, tx := range txList {
+					for _, coin := range tx.Proof.GetInputCoins() {
+						coin.CoinDetails.GetSerialNumber()
+						// coin.CoinDetails.GetSerialNumber().ToBytesS()
+					}
+					for _, coin := range tx.Proof.GetOutputCoins() {
+						coin.CoinDetails.HashH().Bytes()
 					}
 				}
-				coin.CoinDetails.GetSerialNumber()
+
 				fmt.Println(shardID, len(txList))
 			}
 		}(shardInfo.ShardID, shardInfo.Height)
 	}
 	select {}
 }
+
+// save usedCoinHash -> delete usedCoin
+// save OutputCoin
+
+// if coin.CoinDetailsEncrypted != nil && !coin.CoinDetailsEncrypted.IsNil() {
+// 	if len(keySet.ReadonlyKey.Rk) > 0 {
+// 		// try to decrypt to get more data
+// 		err := coin.Decrypt(keySet.ReadonlyKey)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 	}
+// }
