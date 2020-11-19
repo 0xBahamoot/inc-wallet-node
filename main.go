@@ -4,6 +4,9 @@ import (
 	"fmt"
 )
 
+//modes:
+// 1. Public
+// 2. Private (use )
 func main() {
 	endpoint := "http://51.83.237.20:9338"
 	shardInfos, err := GetBlockChainInfo(endpoint)
@@ -35,7 +38,7 @@ func main() {
 	select {}
 }
 
-// save usedCoinHash -> delete usedCoin
+// save usedCoinSN -> delete usedCoin
 // save OutputCoin
 
 // if coin.CoinDetailsEncrypted != nil && !coin.CoinDetailsEncrypted.IsNil() {
