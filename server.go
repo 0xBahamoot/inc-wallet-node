@@ -11,8 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/incognitochain/incognito-chain/rpcserver/rpcservice"
 )
 
 type API_Server struct {
@@ -28,19 +26,19 @@ type JsonRequest struct {
 	Jsonrpc string      `json:"Jsonrpc"`
 	Method  string      `json:"Method"`
 	Params  interface{} `json:"Params"`
-	Id      interface{} `json:"Id"`
+	ID      interface{} `json:"Id"`
 }
 
 func parseJsonRequest(rawMessage []byte, method string) (*JsonRequest, error) {
 	var request JsonRequest
 	if len(rawMessage) == 0 && method == "POST" {
 		fmt.Println("Method - " + method)
-		return &request, rpcservice.NewRPCError(rpcservice.RPCParseError, nil)
+		return &request, errors.New("RPCParseError")
 	}
 	err := json.Unmarshal(rawMessage, &request)
 	if err != nil {
 		// Logger.log.Error("Can not parse", string(rawMessage))
-		return &request, rpcservice.NewRPCError(rpcservice.RPCParseError, err)
+		return &request, errors.New("RPCParseError")
 	} else {
 		return &request, nil
 	}
@@ -119,23 +117,18 @@ func (api *API_Server) ProcessRpcRequest(w http.ResponseWriter, r *http.Request,
 			command := HttpHandler[request.Method]
 			if command == nil {
 				result = nil
-				jsonErr = rpcservice.NewRPCError(rpcservice.RPCMethodNotFoundError, errors.New("Method not found: "+request.Method))
+				jsonErr = errors.New("Method not found: " + request.Method)
 			}
 			if command != nil {
 				result, jsonErr = command(api, request.Params, closeChan)
 			} else {
-				jsonErr = rpcservice.NewRPCError(rpcservice.RPCMethodNotFoundError, errors.New("Method not found: "+request.Method))
+				jsonErr = errors.New("Method not found: " + request.Method)
 			}
 		}
 	}
 
-	if jsonErr.(*rpcservice.RPCError) != nil && r.Method != "OPTIONS" {
-		if jsonErr.(*rpcservice.RPCError).Code == rpcservice.ErrCodeMessage[rpcservice.RPCParseError].Code {
-			// Logger.log.Errorf("RPC function process with err \n %+v", jsonErr)
-			api.writeHTTPResponseHeaders(r, w.Header(), http.StatusBadRequest, buf)
-			// httpServer.addBlackListClientRequestErrorPerHour(r, request.Method)
-			return
-		}
+	if jsonErr != nil && r.Method != "OPTIONS" {
+		api.writeHTTPResponseHeaders(r, w.Header(), http.StatusBadRequest, buf)
 	}
 
 	// if jsonErr != nil && jsonErr.(*rpcservice.RPCError) != nil {
@@ -216,21 +209,13 @@ func (api *API_Server) writeHTTPResponseHeaders(req *http.Request, headers http.
 }
 
 func createMarshalledResponse(request *JsonRequest, result interface{}, replyErr error) ([]byte, error) {
-	var jsonErr *rpcservice.RPCError
-	if replyErr != nil {
-		if jErr, ok := replyErr.(*rpcservice.RPCError); ok {
-			jsonErr = jErr
-		} else {
-			jsonErr = rpcservice.InternalRPCError(replyErr.Error(), "")
-		}
-	}
 	// MarshalResponse marshals the passed id, result, and RPCError to a JSON-RPC
 	// response byte slice that is suitable for transmission to a JSON-RPC client.
 	marshalledResult, err := json.Marshal(result)
 	if err != nil {
 		return nil, err
 	}
-	response, err := newResponse(request, marshalledResult, jsonErr)
+	response, err := newResponse(request, marshalledResult, replyErr)
 	if err != nil {
 		return nil, err
 	}
@@ -242,19 +227,19 @@ func createMarshalledResponse(request *JsonRequest, result interface{}, replyErr
 }
 
 type JsonResponse struct {
-	Id      *interface{}         `json:"Id"`
-	Result  json.RawMessage      `json:"Result"`
-	Error   *rpcservice.RPCError `json:"Error"`
-	Params  interface{}          `json:"Params"`
-	Method  string               `json:"Method"`
-	Jsonrpc string               `json:"Jsonrpc"`
+	Id      *interface{}    `json:"Id"`
+	Result  json.RawMessage `json:"Result"`
+	Error   error           `json:"Error"`
+	Params  interface{}     `json:"Params"`
+	Method  string          `json:"Method"`
+	Jsonrpc string          `json:"Jsonrpc"`
 }
 
-func newResponse(request *JsonRequest, marshalledResult []byte, rpcErr *rpcservice.RPCError) (*JsonResponse, error) {
-	id := request.Id
+func newResponse(request *JsonRequest, marshalledResult []byte, rpcErr error) (*JsonResponse, error) {
+	id := request.ID
 	if !IsValidIDType(id) {
 		str := fmt.Sprintf("The id of type '%T' is invalid", id)
-		return nil, rpcservice.NewRPCError(rpcservice.InvalidTypeError, errors.New(str))
+		return nil, errors.New(str)
 	}
 	pid := &id
 	resp := &JsonResponse{
@@ -264,9 +249,6 @@ func newResponse(request *JsonRequest, marshalledResult []byte, rpcErr *rpcservi
 		Params:  request.Params,
 		Method:  request.Method,
 		Jsonrpc: request.Jsonrpc,
-	}
-	if resp.Error != nil {
-		resp.Error.StackTrace = rpcErr.Error()
 	}
 	return resp, nil
 }
